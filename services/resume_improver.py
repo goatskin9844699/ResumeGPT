@@ -1,4 +1,5 @@
 import os
+import json
 import time
 import subprocess
 from datetime import datetime
@@ -86,7 +87,23 @@ class ResumeImprover:
         """
         try:
             soup = BeautifulSoup(self.job_post_html_data, "html.parser")
+            
+            # First try to get the job description from JSON-LD
+            script_tag = soup.find('script', type='application/ld+json')
+            if script_tag:
+                job_data = json.loads(script_tag.string)
+                if job_data.get('description'):
+                    self.job_post_raw = job_data['description']
+                    config.logger.debug(f"Extracted job description from JSON-LD, length: {len(self.job_post_raw)}")
+                    return
+
+            # If that fails, try regular text extraction
             self.job_post_raw = soup.get_text(separator=" ", strip=True)
+            config.logger.debug(f"Extracted text content length: {len(self.job_post_raw)}")
+            if not self.job_post_raw.strip():
+                config.logger.warning("No text content found in HTML")
+                raise Exception("Empty content extracted from HTML")
+                
         except Exception as e:
             config.logger.error(f"Failed to extract HTML data: {e}")
             raise
